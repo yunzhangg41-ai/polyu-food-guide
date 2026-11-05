@@ -928,7 +928,7 @@ function renderDishes(list) {
 
     card.innerHTML =
       badge +
-      (dish.image ? '<img class="dish-img" src="' + dish.image + '" alt="' + esc(dish.name) + '" loading="lazy" ' + openDetail + '>' : '') +
+      (dish.image ? '<img class="dish-img" src="' + dish.image + '" alt="' + esc(dish.name) + '" loading="lazy" onerror=\"this.remove()\" ' + openDetail + '>' : '') +
       '<div class="dish-head" ' + openDetail + '>' +
         '<span class="dish-name">' + esc(dish.name) + '</span>' +
         '<span style="display:flex;align-items:center;gap:6px;"><span class="dish-price">HK$' + dish.price + '</span>' + favBtn + '</span>' +
@@ -1092,7 +1092,7 @@ function renderFavoritesGrid() {
       return o ? '<span class="tag flavor">' + esc(o.label) + '</span>' : '';
     }).join('');
     card.innerHTML =
-      (dish.image ? '<img class="dish-img" src="' + dish.image + '" alt="' + esc(dish.name) + '" loading="lazy" onclick="openDetailModal(\'' + dish.id + '\')">' : '') +
+      (dish.image ? '<img class="dish-img" src="' + dish.image + '" alt="' + esc(dish.name) + '" loading="lazy" onerror=\"this.remove()\" onclick="openDetailModal(\'' + dish.id + '\')">' : '') +
       '<div class="dish-head" onclick="openDetailModal(\'' + dish.id + '\')">' +
         '<span class="dish-name">' + esc(dish.name) + '</span>' +
         '<span style="display:flex;align-items:center;gap:6px;"><span class="dish-price">HK$' + dish.price + '</span>' +
