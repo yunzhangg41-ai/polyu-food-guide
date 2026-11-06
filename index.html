@@ -371,6 +371,35 @@ const DIETARY_OPTIONS = [
   { value: 'lactose', label: '乳糖不耐' }, { value: 'gluten', label: '麸质过敏' },
 ];
 
+// ===== 统一忌口判断（列表与「今天吃什么」共用同一套规则）=====
+// 以 dietaryTags 为主；再用菜名/描述关键词兜底，避免菜单漏标导致忌口失效
+const DIET_NAME_KEYWORDS = {
+  spicy:  ['辣'],
+  beef:   ['牛'],
+  pork:   ['豬','猪','叉燒','燒腩','煙肉','培根','火腿','香腸','腸仔','餐肉','肉燥','排骨','肉餅'],
+  seafood:['魚','虾','蝦','魷','蟹','蜆','蠔','三文魚','海鮮','魚柳'],
+  lactose:['奶','芝士','忌廉','牛油'],
+  gluten: ['麵','面','包','意粉','通粉','餅','吐司','多士','餃','麥']
+};
+function dishHitsDietary(dish, tag) {
+  if (tag === 'spicy' && dish.flavorTags && dish.flavorTags.indexOf('spicy-hot') >= 0) return true;
+  if (dish.dietaryTags.indexOf(tag) >= 0) return true;
+  const kw = DIET_NAME_KEYWORDS[tag];
+  if (!kw) return false;
+  const hay = (dish.name || '') + ' ' + (dish.description || '') + ' ' + (dish.cuisineType || '');
+  return kw.some(k => hay.indexOf(k) >= 0);
+}
+// 返回 true 表示这道菜符合当前忌口（可以吃）
+function dishAllowedByDiet(dish, exclusions) {
+  if (!exclusions || !exclusions.length) return true;
+  for (const tag of exclusions) {
+    if (tag === 'vegetarian') { if (dish.dietaryTags.indexOf('vegetarian') < 0) return false; }
+    else if (tag === 'halal') { if (dish.dietaryTags.indexOf('halal') < 0) return false; }
+    else if (dishHitsDietary(dish, tag)) return false;
+  }
+  return true;
+}
+
 // 口味偏好
 const FLAVOR_OPTIONS = [
   { value: 'light', label: '清淡' }, { value: 'spicy-hot', label: '香辣' },
@@ -654,12 +683,7 @@ function recommendDishes(dishes, filters, userLoc) {
   // ① 硬过滤：排除命中忌口/过敏原
   let filtered = dishes.filter(dish => {
     if (filters.selectedCanteenId && dish.canteenId !== filters.selectedCanteenId) return false;
-    if (filters.dietaryExclusions.includes('vegetarian') && !dish.dietaryTags.includes('vegetarian')) return false;
-    if (filters.dietaryExclusions.includes('halal') && !dish.dietaryTags.includes('halal')) return false;
-    for (const tag of filters.dietaryExclusions) {
-      if (tag === 'vegetarian' || tag === 'halal') continue;
-      if (dish.dietaryTags.includes(tag)) return false;
-    }
+    if (!dishAllowedByDiet(dish, filters.dietaryExclusions)) return false;
     // 口味偏好：选中后只保留包含至少一个所选口味的菜品（未选口味时不过滤）
     if (filters.flavorPreferences.length > 0 && !filters.flavorPreferences.some(f => dish.flavorTags.includes(f))) return false;
     return true;
@@ -1178,17 +1202,19 @@ function toggleDetailFavorite() { if (currentDetail) { toggleFavorite(currentDet
 let surprisePool = [];
 let currentRoll = null;
 function openSurpriseModal() {
-  let pool = MOCK_DISHES.filter(d => {
-    if (state.dietaryExclusions.length > 0) {
-      for (const t of state.dietaryExclusions) { if (d.dietaryTags.indexOf(t) < 0) return false; }
-    }
-    return true;
-  });
+  // 严格排除忌口/过敏原（规则与列表完全一致）
+  let pool = MOCK_DISHES.filter(d => dishAllowedByDiet(d, state.dietaryExclusions));
+  const dietFilteredCount = MOCK_DISHES.length - pool.length;
   pool = applyExtraFilters(pool);
+  // 口味偏好只做优先，不把池子清空
+  if (state.flavorPreferences.length > 0 && pool.length > 0) {
+    const flav = pool.filter(d => state.flavorPreferences.some(f => d.flavorTags.indexOf(f) >= 0));
+    if (flav.length > 0) pool = flav;
+  }
   if (pool.length === 0) { alert('当前忌口/筛选下没有可抽的菜品，请先放宽筛选'); return; }
   surprisePool = pool;
   $('surpriseNote').textContent = state.dietaryExclusions.length > 0
-    ? '已按忌口智能过滤（' + state.dietaryExclusions.length + ' 项）'
+    ? '已按忌口排除 ' + dietFilteredCount + ' 款，剩 ' + pool.length + ' 款可抽'
     : '全校 ' + pool.length + ' 款真实菜品随机抽签';
   $('surpriseModal').classList.add('show');
   rollSurpriseDish();
